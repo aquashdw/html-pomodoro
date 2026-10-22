@@ -1,0 +1,18 @@
+{
+  "name": "Stilltime — Focus timer",
+  "short_name": "Stilltime",
+  "description": "A calm Pomodoro timer for focused work and restful breaks.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f1e9",
+  "theme_color": "#f4f1e9",
+  "icons": [
+    {
+      "src": "stilltime-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f1e9">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Pomodoro — Focus, one interval at a time</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f4f1e9;
+      --ink: #252923;
+      --muted: #777b70;
+      --line: #dcd9cf;
+      --accent: #b64c35;
+      --accent-dark: #923b29;
+      --green: #66765b;
+      --surface: #fbfaf6;
+      --shadow: 0 24px 80px rgb(38 42 34 / 12%);
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 50% 44%, rgb(255 255 255 / 78%), transparent 54%),
+        var(--paper);
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .app {
+      display: flex;
+      min-height: 100vh;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 24px 24px;
+    }
+
+    header {
+      display: flex;
+      width: min(100%, 1080px);
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      color: var(--accent);
+      font-size: 15px;
+    }
+
+    .icon-button {
+      display: inline-grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: rgb(255 255 255 / 35%);
+      cursor: pointer;
+      transition: background .2s, border-color .2s, transform .2s;
+    }
+
+    .icon-button:hover { transform: rotate(20deg); border-color: #aaa99e; background: white; }
+    .icon-button svg { width: 19px; height: 19px; }
+
+    main {
+      display: flex;
+      width: min(100%, 920px);
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 0 36px;
+      text-align: center;
+    }
+
+    .timer-layout {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(38px, 8vw, 100px);
+    }
+
+    .clock-column { flex: 0 1 auto; }
+    .timer-info {
+      display: flex;
+      flex: 0 1 330px;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+    }
+
+    .eyebrow {
+      margin: 0 0 9px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(30px, 4.5vw, 43px);
+      font-weight: 400;
+      letter-spacing: -.04em;
+    }
+
+    .clock-wrap {
+      position: relative;
+      width: min(39vw, 390px);
+      min-width: 300px;
+      margin: 0;
+      aspect-ratio: 1;
+    }
+
+    .clock-face {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      border: 1px solid #d9d5c9;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 44%, #fffefa 0, #fbfaf6 63%, #f2efe6 100%);
+      box-shadow: 0 20px 56px rgb(58 54 44 / 10%), inset 0 0 0 9px rgb(255 255 255 / 48%);
+    }
+
+    .clock-face::before {
+      position: absolute;
+      inset: 14px;
+      border: 1px solid rgb(218 215 205 / 65%);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .ticks, .numbers, .hands { position: absolute; inset: 0; }
+    .tick {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      width: 1px;
+      height: 7px;
+      background: #c7c5bb;
+      transform-origin: 50% calc(100% + 0px);
+    }
+    .tick.major { top: 17px; width: 2px; height: 12px; background: #777b70; }
+
+    .number {
+      position: absolute;
+      color: #70746a;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      transform: translate(-50%, -50%);
+    }
+
+    .number[data-n="12"] { top: 12%; left: 50%; }
+    .number[data-n="3"] { top: 50%; left: 88%; }
+    .number[data-n="6"] { top: 88%; left: 50%; }
+    .number[data-n="9"] { top: 50%; left: 12%; }
+
+    .hands { pointer-events: none; }
+    .hand {
+      position: absolute;
+      bottom: 50%;
+      left: calc(50% - 1px);
+      width: 2px;
+      border-radius: 5px;
+      background: var(--ink);
+      transform-origin: 50% 100%;
+      transform: rotate(0deg);
+      transition: transform .35s linear;
+    }
+    .hand.second { height: 39%; background: var(--accent); }
+    .pivot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 11px;
+      height: 11px;
+      border: 2px solid var(--surface);
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+      transform: translate(-50%, -50%);
+    }
+
+    .clock-readout {
+      position: absolute;
+      top: 59%;
+      left: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -50%);
+    }
+    .time {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(39px, 8vw, 56px);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -.06em;
+      line-height: 1;
+    }
+    .phase {
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .rep-counter {
+      display: inline-flex;
+      min-height: 38px;
+      align-items: center;
+      gap: 10px;
+      margin-top: 19px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgb(255 255 255 / 35%);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .rep-counter strong {
+      color: var(--accent);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 17px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+    }
+    .controls { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+    .controls .button { width: 142px; min-width: 0; }
+    .button {
+      display: inline-flex;
+      min-width: 142px;
+      min-height: 48px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 22px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      transition: transform .15s, background .2s, box-shadow .2s;
+    }
+    .button:hover { transform: translateY(-1px); }
+    .button:active { transform: translateY(0); }
+    .button-primary {
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 5px 14px rgb(182 76 53 / 22%);
+    }
+    .button-primary:hover { background: var(--accent-dark); }
+    .button-secondary { min-width: 112px; border-color: var(--line); background: transparent; }
+    .button-secondary:hover { background: rgb(255 255 255 / 65%); }
+    .button svg { width: 16px; height: 16px; }
+
+    .hint {
+      margin: 19px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    footer {
+      color: #95958b;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 12px;
+      font-style: italic;
+    }
+
+    dialog {
+      width: min(100% - 32px, 500px);
+      max-height: min(88vh, 760px);
+      padding: 0;
+      overflow: auto;
+      border: 1px solid rgb(220 217 207 / 90%);
+      border-radius: 18px;
+      color: var(--ink);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    dialog::backdrop { background: rgb(28 32 27 / 44%); backdrop-filter: blur(3px); }
+    .dialog-content { padding: 27px; }
+    .dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .dialog-header h2 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 28px;
+      font-weight: 400;
+    }
+    .dialog-header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .close-button { flex: 0 0 auto; width: 34px; height: 34px; border: 0; background: transparent; font-size: 23px; }
+    .settings-list { display: grid; gap: 10px; margin: 23px 0 15px; padding: 0; list-style: none; }
+    .setting-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 105px 34px;
+      align-items: end;
+      gap: 10px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fffefa;
+    }
+    .field { display: grid; gap: 6px; text-align: left; }
+    .field label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .field input {
+      width: 100%;
+      min-width: 0;
+      height: 38px;
+      padding: 0 10px;
+      border: 1px solid #e3e0d7;
+      border-radius: 7px;
+      outline: none;
+      color: var(--ink);
+      background: #fff;
+    }
+    .field input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgb(102 118 91 / 12%); }
+    .remove-row {
+      width: 34px;
+      height: 38px;
+      border: 0;
+      border-radius: 7px;
+      color: #8a817a;
+      background: transparent;
+      cursor: pointer;
+      font-size: 19px;
+    }
+    .remove-row:hover { color: var(--accent); background: #f7eeea; }
+    .text-button {
+      padding: 7px 0;
+      border: 0;
+      color: var(--green);
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .text-button:hover { text-decoration: underline; }
+    .dialog-message { min-height: 18px; margin: 10px 0 0; color: var(--accent-dark); font-size: 12px; }
+    .dialog-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+    .file-actions { display: flex; gap: 14px; }
+    .dialog-actions .button { min-width: 105px; min-height: 42px; padding: 0 17px; }
+    input[type="file"] { display: none; }
+    button:focus-visible, input:focus-visible, label:focus-visible {
+      outline: 3px solid rgb(102 118 91 / 42%);
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 480px) {
+      .app { padding: 20px 18px 18px; }
+      header { width: 100%; }
+      .clock-wrap { width: min(80vw, 340px); min-width: 0; }
+      .dialog-content { padding: 21px 18px; }
+      .setting-row { grid-template-columns: minmax(0, 1fr) 88px 30px; gap: 7px; padding: 10px; }
+      .dialog-actions { align-items: flex-end; }
+      .file-actions { flex-direction: column; gap: 5px; align-items: flex-start; }
+    }
+
+    @media (max-width: 700px) {
+      main { width: 100%; padding: 20px 0 36px; }
+      .timer-layout { flex-direction: column; gap: 21px; }
+      .timer-info { flex: 0 1 auto; align-items: center; text-align: center; }
+      .clock-wrap { width: min(80vw, 340px); }
+      .controls { margin-top: 20px; }
+    }
+
+    @media (max-width: 360px) {
+      .controls { max-width: 100%; flex-wrap: wrap; justify-content: center; gap: 8px; }
+      .controls .button { width: 142px; min-width: 0; padding: 0 12px; }
+      .dialog-content { padding: 18px 14px; }
+      .setting-row { grid-template-columns: minmax(0, 1fr) 68px 28px; gap: 6px; padding: 8px; }
+      .dialog-actions { gap: 6px; }
+      .dialog-actions .button { min-width: 0; padding: 0 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">◷</span> Stilltime</div>
+      <button class="icon-button" id="open-settings" type="button" aria-label="Open timer settings" title="Timer settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Z"/>
+          <path d="m19.4 15 .1.1a1.8 1.8 0 1 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3.1 1.3v.2a1.8 1.8 0 1 1-3.6 0v-.2a1.8 1.8 0 0 0-3.1-1.3l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-1.3-3.1h-.2a1.8 1.8 0 1 1 0-3.6h.2a1.8 1.8 0 0 0 1.3-3.1l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3.1-1.3v-.2a1.8 1.8 0 1 1 3.6 0v.2a1.8 1.8 0 0 0 3.1 1.3l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 1.3 3.1h.2a1.8 1.8 0 1 1 0 3.6h-.2a1.8 1.8 0 0 0-1.3 3.1Z"/>
+        </svg>
+      </button>
+    </header>
+
+    <main>
+      <div class="timer-layout">
+        <div class="clock-column">
+          <div class="clock-wrap" role="img" aria-label="Analogue countdown clock">
+            <div class="clock-face">
+              <div class="ticks" id="ticks" aria-hidden="true"></div>
+              <div class="numbers" aria-hidden="true">
+                <span class="number" data-n="12">12</span>
+                <span class="number" data-n="3">3</span>
+                <span class="number" data-n="6">6</span>
+                <span class="number" data-n="9">9</span>
+              </div>
+              <div class="hands" aria-hidden="true">
+                <span class="hand second" id="second-hand"></span>
+                <span class="pivot"></span>
+              </div>
+              <div class="clock-readout">
+                <span class="time" id="time" aria-live="off">25:00</span>
+                <span class="phase" id="phase">Ready when you are</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="timer-info">
+          <p class="eyebrow" id="status-label">A little space to focus</p>
+          <h1 id="interval-title">Work</h1>
+          <div class="rep-counter" aria-label="Completed repetitions">
+            <span>Reps</span>
+            <strong id="rep-count" aria-live="polite">0</strong>
+          </div>
+          <div class="controls">
+            <button class="button button-primary" id="start-button" type="button">
+              <svg id="start-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.8v10.4L13 8 4 2.8Z"/></svg>
+              <span id="start-label">Start focus</span>
+            </button>
+            <button class="button button-secondary" id="reset-button" type="button">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.2 5.2A5.4 5.4 0 1 1 2.7 9"/><path d="M2.5 3v3.3h3.3"/></svg>
+              Reset
+            </button>
+          </div>
+          <p class="hint" id="hint">One thing at a time. You’ve got this.</p>
+        </div>
+      </div>
+    </main>
+
+    <footer>Make room for what matters.</footer>
+  </div>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form class="dialog-content" id="settings-form">
+      <div class="dialog-header">
+        <div>
+          <h2 id="settings-title">Your intervals</h2>
+          <p>Set the rhythm that helps you do your best work.</p>
+        </div>
+        <button class="icon-button close-button" id="close-settings" type="button" aria-label="Close settings">×</button>
+      </div>
+      <ol class="settings-list" id="settings-list"></ol>
+      <button class="text-button" id="add-interval" type="button">+ Add an interval</button>
+      <p class="dialog-message" id="dialog-message" role="status"></p>
+      <div class="dialog-actions">
+        <div class="file-actions">
+          <button class="text-button" id="export-settings" type="button">Export</button>
+          <button class="text-button" id="import-settings" type="button">Import</button>
+          <input id="import-file" type="file" accept="application/json,.json">
+        </div>
+        <button class="button button-primary" type="submit">Save settings</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "stilltime.settings.v1";
+      const DEFAULT_INTERVALS = [
+        { label: "Work", minutes: 25 },
+        { label: "Rest", minutes: 5 }
+      ];
+      const elements = {
+        ticks: document.getElementById("ticks"),
+        time: document.getElementById("time"),
+        title: document.getElementById("interval-title"),
+        status: document.getElementById("status-label"),
+        phase: document.getElementById("phase"),
+        hint: document.getElementById("hint"),
+        secondHand: document.getElementById("second-hand"),
+        repCount: document.getElementById("rep-count"),
+        startButton: document.getElementById("start-button"),
+        startLabel: document.getElementById("start-label"),
+        startIcon: document.getElementById("start-icon"),
+        settingsButton: document.getElementById("open-settings"),
+        resetButton: document.getElementById("reset-button"),
+        dialog: document.getElementById("settings-dialog"),
+        form: document.getElementById("settings-form"),
+        list: document.getElementById("settings-list"),
+        message: document.getElementById("dialog-message"),
+        importFile: document.getElementById("import-file")
+      };
+
+      let intervals = loadSettings();
+      let currentIndex = 0;
+      let remainingSeconds = intervals[0].minutes * 60;
+      let deadline = 0;
+      let timerId = null;
+      let running = false;
+      let handElapsedSeconds = 0;
+      let handStartedAt = 0;
+      let repCount = 0;
+      let audioContext = null;
+      let notificationPermissionRequested = false;
+      let notificationStatus = getNotificationStatus();
+
+      function getNotificationStatus() {
+        if (!("Notification" in window)) {
+          return "Desktop notifications aren't supported in this browser.";
+        }
+        if (Notification.permission === "granted") return "Desktop alerts are on.";
+        if (location.protocol === "file:") {
+          return "Open this timer via localhost or HTTPS to enable desktop alerts.";
+        }
+        if (Notification.permission === "denied") {
+          return "Desktop alerts are blocked. Allow them in your browser's site settings.";
+        }
+        return "";
+      }
+
+      function normalizeIntervals(value) {
+        if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
+          throw new Error("Settings must contain between 1 and 20 intervals.");
+        }
+        return value.map((item, index) => {
+          const label = typeof item.label === "string" ? item.label.trim() : "";
+          const minutes = Number(item.minutes);
+          if (!label || label.length > 32 || !Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+            throw new Error(`Interval ${index + 1} needs a label (up to 32 characters) and a whole duration from 1 to 1440 minutes.`);
+          }
+          return { label, minutes };
+        });
+      }
+
+      function loadSettings() {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          return saved ? normalizeIntervals(JSON.parse(saved)) : DEFAULT_INTERVALS.map(item => ({ ...item }));
+        } catch (error) {
+          console.warn("Could not load saved timer settings; using defaults.", error);
+          return DEFAULT_INTERVALS.map(item => ({ ...item }));
+        }
+      }
+
+      function saveSettings(value) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+        } catch (error) {
+          throw new Error(`Could not save settings in this browser: ${error.message}`);
+        }
+      }
+
+      function drawTicks() {
+        const fragment = document.createDocumentFragment();
+        for (let index = 0; index < 60; index += 1) {
+          const tick = document.createElement("span");
+          tick.className = index % 5 === 0 ? "tick major" : "tick";
+          tick.style.transform = `translateX(-50%) rotate(${index * 6}deg)`;
+          fragment.append(tick);
+        }
+        elements.ticks.replaceChildren(fragment);
+      }
+
+      function render(snapHands = false) {
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = remainingSeconds % 60;
+        elements.time.textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+        elements.title.textContent = intervals[currentIndex].label;
+        elements.phase.textContent = running ? "Time to focus" : "Ready when you are";
+        elements.status.textContent = running ? "A little space to focus" : "A little space to focus";
+        elements.startLabel.textContent = running ? "Pause" : "Start focus";
+        elements.startIcon.innerHTML = running
+          ? '<path d="M4 3h3v10H4zM9 3h3v10H9z"/>'
+          : '<path d="M4 2.8v10.4L13 8 4 2.8Z"/>';
+        const timerHint = running
+          ? `Stay with it. ${intervals[(currentIndex + 1) % intervals.length].label} comes next.`
+          : "One thing at a time. You’ve got this.";
+        elements.hint.textContent = notificationStatus ? `${timerHint} ${notificationStatus}` : timerHint;
+        const elapsedForHands = handElapsedSeconds + (running ? (Date.now() - handStartedAt) / 1000 : 0);
+        const handRotation = `rotate(${-elapsedForHands * 6}deg)`;
+        if (snapHands) {
+          elements.secondHand.style.transition = "none";
+          elements.secondHand.style.transform = handRotation;
+          elements.secondHand.getBoundingClientRect();
+          elements.secondHand.style.removeProperty("transition");
+        } else {
+          elements.secondHand.style.transform = handRotation;
+        }
+        elements.repCount.textContent = String(repCount);
+        document.title = `${elements.time.textContent} · ${intervals[currentIndex].label} — Stilltime`;
+      }
+
+      function pause() {
+        if (timerId !== null) window.clearInterval(timerId);
+        timerId = null;
+        if (running) {
+          handElapsedSeconds += (Date.now() - handStartedAt) / 1000;
+          handStartedAt = 0;
+        }
+        running = false;
+        render();
+      }
+
+      function playChime() {
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          audioContext = audioContext || new AudioContextClass();
+          if (audioContext.state === "suspended") audioContext.resume();
+          const now = audioContext.currentTime;
+          [660, 880].forEach((frequency, index) => {
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            oscillator.type = "sine";
+            oscillator.frequency.value = frequency;
+            gain.gain.setValueAtTime(0.0001, now + index * 0.18);
+            gain.gain.exponentialRampToValueAtTime(0.16, now + index * 0.18 + 0.025);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.18 + 0.42);
+            oscillator.connect(gain);
+            gain.connect(audioContext.destination);
+            oscillator.start(now + index * 0.18);
+            oscillator.stop(now + index * 0.18 + 0.45);
+          });
+        } catch (error) {
+          console.warn("The interval chime could not be played.", error);
+        }
+      }
+
+      function requestNotificationPermission() {
+        notificationStatus = getNotificationStatus();
+        if (notificationStatus) return;
+        if (notificationPermissionRequested) return;
+
+        notificationPermissionRequested = true;
+        try {
+          Notification.requestPermission().then(permission => {
+            notificationStatus = getNotificationStatus() ||
+              (permission === "default" ? "Allow notifications in your browser to get interval alerts." : "");
+            render();
+          }).catch(error => {
+            console.warn("Could not request desktop notification permission.", error);
+            notificationStatus = "Desktop alerts couldn't be enabled.";
+            render();
+          });
+        } catch (error) {
+          console.warn("Could not request desktop notification permission.", error);
+          notificationStatus = "Desktop alerts couldn't be enabled.";
+        }
+      }
+
+      function notifyIntervalEnd(completedInterval, nextInterval) {
+        if (!("Notification" in window) || Notification.permission !== "granted") return;
+        try {
+          new Notification(`${completedInterval.label} complete`, {
+            body: `${nextInterval.label} starts now.`
+          });
+        } catch (error) {
+          console.warn("The interval notification could not be shown.", error);
+          notificationStatus = "An interval alert couldn't be shown.";
+        }
+      }
+
+      function tick(snapHands = false) {
+        const secondsLeft = Math.ceil((deadline - Date.now()) / 1000);
+        if (secondsLeft <= 0) {
+          const completedInterval = intervals[currentIndex];
+          currentIndex = (currentIndex + 1) % intervals.length;
+          if (currentIndex === 0) repCount += 1;
+          remainingSeconds = intervals[currentIndex].minutes * 60;
+          deadline = Date.now() + remainingSeconds * 1000;
+          playChime();
+          notifyIntervalEnd(completedInterval, intervals[currentIndex]);
+        } else {
+          remainingSeconds = secondsLeft;
+        }
+        render(snapHands);
+      }
+
+      function start() {
+        if (running) {
+          remainingSeconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+          pause();
+          return;
+        }
+        requestNotificationPermission();
+        running = true;
+        deadline = Date.now() + remainingSeconds * 1000;
+        handStartedAt = Date.now();
+        timerId = window.setInterval(tick, 200);
+        render();
+      }
+
+      function reset() {
+        pause();
+        currentIndex = 0;
+        remainingSeconds = intervals[0].minutes * 60;
+        handElapsedSeconds = 0;
+        repCount = 0;
+        render();
+      }
+
+      function renderSettings(value = intervals) {
+        const fragment = document.createDocumentFragment();
+        value.forEach((interval, index) => {
+          const row = document.createElement("li");
+          row.className = "setting-row";
+          row.innerHTML = `
+            <div class="field">
+              <label for="interval-label-${index}">Interval ${index + 1} · label</label>
+              <input id="interval-label-${index}" name="label" type="text" maxlength="32" required value="${escapeAttribute(interval.label)}" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="interval-minutes-${index}">Minutes</label>
+              <input id="interval-minutes-${index}" name="minutes" type="number" min="1" max="1440" step="1" required value="${interval.minutes}">
+            </div>
+            <button class="remove-row" type="button" aria-label="Remove interval ${index + 1}" title="Remove interval">×</button>`;
+          row.querySelector(".remove-row").addEventListener("click", () => {
+            if (elements.list.children.length <= 1) {
+              elements.message.textContent = "Keep at least one interval in your timer.";
+              return;
+            }
+            row.remove();
+            renumberSettings();
+          });
+          fragment.append(row);
+        });
+        elements.list.replaceChildren(fragment);
+        elements.message.textContent = "";
+      }
+
+      function escapeAttribute(value) {
+        return value.replace(/[&<>"']/g, character => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[character]);
+      }
+
+      function renumberSettings() {
+        [...elements.list.children].forEach((row, index) => {
+          row.querySelector("label[for^='interval-label-']").textContent = `Interval ${index + 1} · label`;
+          row.querySelector("label[for^='interval-label-']").htmlFor = `interval-label-${index}`;
+          row.querySelector("input[name='label']").id = `interval-label-${index}`;
+          row.querySelector("label[for^='interval-minutes-']").htmlFor = `interval-minutes-${index}`;
+          row.querySelector("input[name='minutes']").id = `interval-minutes-${index}`;
+          row.querySelector(".remove-row").setAttribute("aria-label", `Remove interval ${index + 1}`);
+        });
+      }
+
+      function readSettingsForm() {
+        const rows = [...elements.list.querySelectorAll(".setting-row")];
+        return normalizeIntervals(rows.map(row => ({
+          label: row.querySelector("input[name='label']").value,
+          minutes: Number(row.querySelector("input[name='minutes']").value)
+        })));
+      }
+
+      elements.startButton.addEventListener("click", start);
+      elements.resetButton.addEventListener("click", reset);
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) return;
+        if (running) tick(true);
+        else render(true);
+      });
+      elements.settingsButton.addEventListener("click", () => {
+        renderSettings();
+        elements.dialog.showModal();
+      });
+      document.getElementById("close-settings").addEventListener("click", () => elements.dialog.close());
+      elements.dialog.addEventListener("click", event => {
+        if (event.target === elements.dialog) elements.dialog.close();
+      });
+      document.getElementById("add-interval").addEventListener("click", () => {
+        if (elements.list.children.length >= 20) {
+          elements.message.textContent = "You can add up to 20 intervals.";
+          return;
+        }
+        const next = [...elements.list.querySelectorAll(".setting-row")].map(row => ({
+          label: row.querySelector("input[name='label']").value,
+          minutes: Number(row.querySelector("input[name='minutes']").value) || 5
+        }));
+        next.push({ label: "New interval", minutes: 5 });
+        renderSettings(next);
+        elements.list.lastElementChild.querySelector("input[name='label']").focus();
+      });
+      elements.form.addEventListener("submit", event => {
+        event.preventDefault();
+        try {
+          const updated = readSettingsForm();
+          saveSettings(updated);
+          const changed = JSON.stringify(updated) !== JSON.stringify(intervals);
+          intervals = updated;
+          if (changed) reset();
+          else render();
+          elements.dialog.close();
+        } catch (error) {
+          elements.message.textContent = error.message;
+        }
+      });
+      document.getElementById("export-settings").addEventListener("click", () => {
+        try {
+          const current = readSettingsForm();
+          const blob = new Blob([`${JSON.stringify(current, null, 2)}\n`], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "stilltime-settings.json";
+          link.click();
+          URL.revokeObjectURL(url);
+          elements.message.textContent = "Settings exported.";
+        } catch (error) {
+          elements.message.textContent = error.message;
+        }
+      });
+      document.getElementById("import-settings").addEventListener("click", () => elements.importFile.click());
+      elements.importFile.addEventListener("change", async () => {
+        const file = elements.importFile.files[0];
+        if (!file) return;
+        try {
+          const imported = normalizeIntervals(JSON.parse(await file.text()));
+          renderSettings(imported);
+          elements.message.textContent = "File loaded. Save settings to apply them.";
+        } catch (error) {
+          elements.message.textContent = `Could not import settings: ${error.message}`;
+        } finally {
+          elements.importFile.value = "";
+        }
+      });
+
+      drawTicks();
+      render();
+    })();
+  </script>
+</body>
+</html>
